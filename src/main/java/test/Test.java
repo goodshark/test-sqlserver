@@ -25,10 +25,14 @@ public class Test {
 
         System.out.println("tree: " + tree.toStringTree(parser));
         EvalVisitor eval = new EvalVisitor();
+        eval.run(tree);
+        eval.debugSql();
+        /*System.out.println("tree: " + tree.toStringTree(parser));
+        EvalVisitor eval = new EvalVisitor();
         eval.visit(tree);
         System.out.println("init sql: " + eval.getSql());
         eval.testMap();
-        System.out.println("final sql: " + eval.subsitute());
+        System.out.println("final sql: " + eval.subsitute());*/
 //        ParseTreeWalker walker = new ParseTreeWalker();
 //        EvalListener lis = new EvalListener();
 //        walker.walk(lis, tree);

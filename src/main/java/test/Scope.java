@@ -23,5 +23,27 @@ public class Scope {
         this.type = type;
     }
 
-    public void addVariable() {}
+    // testonly
+    public void debugVars() {
+        for (Var v: vars) {
+            System.out.println(v);
+        }
+    }
+
+    public void addVariable(Var v) {
+        vars.add(v);
+    }
+
+    public Var findVariable(String name) {
+        for (Var v: vars) {
+            if (v.getName().equalsIgnoreCase(name)) {
+                return v;
+            }
+        }
+        return null;
+    }
+
+    public String toString() {
+        return "scope <" + type.toString() + ">";
+    }
 }
