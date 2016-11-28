@@ -192,7 +192,10 @@ public class EvalVisitor extends TsqlBaseVisitor<Integer>  {
 
     @Override
     public Integer visitPrint_statement(TsqlParser.Print_statementContext ctx) {
-        return visitChildren(ctx);
+        if (ctx.expression() != null) {
+            print(ctx.expression().getText());
+        }
+        return 0;
     }
 
 
