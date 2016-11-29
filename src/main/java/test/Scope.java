@@ -1,6 +1,9 @@
 package test;
 
+import org.antlr.v4.runtime.tree.ParseTree;
+
 import java.util.ArrayList;
+import java.util.HashMap;
 
 /**
  * Created by dengrb1 on 11/24 0024.
@@ -10,6 +13,7 @@ public class Scope {
     public enum Type { GLOBAL, BEGIN_END, LOOP };
 
     ArrayList<Var> vars = new ArrayList<Var>();
+    HashMap<String, ParseTree> labels = new HashMap<String, ParseTree>();
     Scope parent;
     Type type;
 
@@ -41,6 +45,16 @@ public class Scope {
             }
         }
         return null;
+    }
+
+    public void addGotoLabel(String label, ParseTree ctx) {
+        if (!labels.containsKey(label)) {
+            labels.put(label, ctx);
+        }
+    }
+
+    public ParseTree findLabel(String label) {
+        return labels.get(label);
     }
 
     public String toString() {

@@ -4,7 +4,9 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.misc.Interval;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Stack;
 
 /**
@@ -115,7 +117,26 @@ public class EvalVisitor extends TsqlBaseVisitor<Integer>  {
     public void run(ParseTree tree) {
         enterGlobalScope();
         visit(tree);
+        // TODO signals is not empty
+        rewind(tree);
         leaveGlobalScope();
+    }
+
+    public void rewind(ParseTree tree) {
+        Signal sig = null;
+        while (true) {
+            if (signals.empty()) {
+                break;
+            } else {
+                sig = signals.peek();
+            }
+            if (sig != null && sig.getType() == Signal.Type.GOTO) {
+                if (curScope.labels.containsKey(sig.getValue())) {
+                    print("start rewind the tree");
+                    visit(tree);
+                }
+            }
+        }
     }
 
     public Var findVariable(String name) {
@@ -143,11 +164,33 @@ public class EvalVisitor extends TsqlBaseVisitor<Integer>  {
     public Integer visitSql_clause(TsqlParser.Sql_clauseContext ctx) {
         // TODO implement the RETURN STMT
         // if we meet a BREAK/CONTINUE, we need to adjust the process
-        if (!signals.empty()) {
-            print("meet a BREAK/CONTINUE, do not eval");
+        if (canIgnore(ctx)) {
+            print("meet a BREAK/CONTINUE/GOTO, do not eval");
             return 0;
         }
         return visitChildren(ctx);
+    }
+
+    public boolean canIgnore(TsqlParser.Sql_clauseContext ctx) {
+        Signal sig = null;
+        if (signals.empty()) {
+            return false;
+        } else {
+            sig = signals.peek();
+            // match GOTO ctx
+            if (sig.getType() == Signal.Type.GOTO && ctx.cfl_statement() != null) {
+                List<ParseTree> childList = null;
+                childList = ctx.cfl_statement().children;
+                if (childList.size() >= 2) {
+                    if (childList.get(0) instanceof TsqlParser.IdContext &&
+                        childList.get(1).getText().equalsIgnoreCase(":")) {
+                        return false;
+                    }
+                }
+            }
+            // BREAK/CONTINUE/GOTO
+            return true;
+        }
     }
 
     @Override
@@ -160,13 +203,16 @@ public class EvalVisitor extends TsqlBaseVisitor<Integer>  {
         if (signals.empty()) {
             return true;
         } else {
+            sig = signals.peek();
             // get CONTINUE/BREAK signal
-            sig = signals.pop();
             if (sig.getType() == Signal.Type.LEAVE_LOOP) {
+                signals.pop();
                 return false;
             } else if (sig.getType() == Signal.Type.CONTINUE) {
+                signals.pop();
                 return true;
             } else {
+                // let GOTO signal remain
                 return false;
             }
         }
@@ -217,6 +263,37 @@ public class EvalVisitor extends TsqlBaseVisitor<Integer>  {
             }
         }
         return 0;
+    }
+
+    @Override
+    public Integer visitGoto_statement(TsqlParser.Goto_statementContext ctx) {
+        String gotoLabel = null;
+        if (ctx.id() != null)
+            gotoLabel = ctx.id().getText();
+        // GOTO action
+        if (ctx.GOTO() != null) {
+            // always forward goto (backward goto will rewind the tree)
+            Signal sig = new Signal(Signal.Type.GOTO, gotoLabel);
+            signals.push(sig);
+        } else {
+            // GOTO label
+            curScope.addGotoLabel(gotoLabel, ctx);
+            // forward goto get here
+            matchSignalLabel(gotoLabel);
+        }
+        return 0;
+    }
+
+    public void matchSignalLabel(String label) {
+        Signal sig = null;
+        if (signals.empty()) {
+            return;
+        }
+        sig = signals.peek();
+        if (sig.getType() == Signal.Type.GOTO && sig.getValue().equalsIgnoreCase(label)) {
+            // forward goto match success
+            signals.pop();
+        }
     }
 
     public Var operate(String op, Var v1, Var v2) {
