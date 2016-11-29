@@ -23,7 +23,7 @@ public class Test {
         TsqlParser parser = new TsqlParser(tokens);
         ParseTree tree = parser.tsql_file(); // parse
 
-        System.out.println("tree: " + tree.toStringTree(parser));
+        System.out.println("tree: " + tree.toStringTree(parser) + "\n");
         EvalVisitor eval = new EvalVisitor();
         eval.run(tree);
         eval.debugSql();

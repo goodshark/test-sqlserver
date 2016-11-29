@@ -55,6 +55,8 @@ public class EvalVisitor extends TsqlBaseVisitor<Integer>  {
     private Stack<Scope> scopes = new Stack<Scope>();
     private Scope curScope = null;
 
+    private Stack<Signal> signals = new Stack<Signal>();
+
     private Query query = new Query();
 
     public String getSql() {
@@ -98,7 +100,7 @@ public class EvalVisitor extends TsqlBaseVisitor<Integer>  {
 
     public void leaveSocpe() {
         if (!scopes.empty()) {
-            scopes.pop();
+            curScope = scopes.pop().parent;
         }
     }
 
@@ -138,8 +140,36 @@ public class EvalVisitor extends TsqlBaseVisitor<Integer>  {
     }
 
     @Override
+    public Integer visitSql_clause(TsqlParser.Sql_clauseContext ctx) {
+        // TODO implement the RETURN STMT
+        // if we meet a BREAK/CONTINUE, we need to adjust the process
+        if (!signals.empty()) {
+            print("meet a BREAK/CONTINUE, do not eval");
+            return 0;
+        }
+        return visitChildren(ctx);
+    }
+
+    @Override
     public Integer visitBlock_statement(TsqlParser.Block_statementContext ctx) {
         return visitChildren(ctx);
+    }
+
+    public Boolean proceed() {
+        Signal sig = null;
+        if (signals.empty()) {
+            return true;
+        } else {
+            // get CONTINUE/BREAK signal
+            sig = signals.pop();
+            if (sig.getType() == Signal.Type.LEAVE_LOOP) {
+                return false;
+            } else if (sig.getType() == Signal.Type.CONTINUE) {
+                return true;
+            } else {
+                return false;
+            }
+        }
     }
 
     @Override
@@ -150,9 +180,40 @@ public class EvalVisitor extends TsqlBaseVisitor<Integer>  {
                 enterScope(Scope.Type.LOOP);
                 visit(ctx.sql_clause());
                 leaveSocpe();
-            } else {
-                print("leave while stmt");
-                break;
+                if (proceed()) {
+                    continue;
+                }
+            }
+            print("leave while stmt");
+            break;
+        }
+        return 0;
+    }
+
+    @Override
+    public Integer visitBreak_statement(TsqlParser.Break_statementContext ctx) {
+        print("meet break stmt");
+        Signal sig = new Signal(Signal.Type.LEAVE_LOOP, "exit loop");
+        signals.push(sig);
+        return 0;
+    }
+
+    @Override
+    public Integer visitContinue_statement(TsqlParser.Continue_statementContext ctx) {
+        print("meet continue stmt");
+        Signal sig = new Signal(Signal.Type.CONTINUE, "continue loop");
+        signals.push(sig);
+        return 0;
+    }
+
+    @Override
+    public Integer visitIf_statement(TsqlParser.If_statementContext ctx) {
+        print("meet if stmt");
+        if (evalSubTree(ctx.search_condition()).isTrue()) {
+            visit(ctx.sql_clause(0));
+        } else {
+            if (ctx.ELSE() != null) {
+                visit(ctx.sql_clause(1));
             }
         }
         return 0;
@@ -162,11 +223,13 @@ public class EvalVisitor extends TsqlBaseVisitor<Integer>  {
         Var res = new Var(false);
         int tmpRes = v1.compare(v2);
         if (tmpRes == 0 && op.equalsIgnoreCase("=")) {
-                res.attach(new Var(true));
+            res.attach(new Var(true));
         } else if (tmpRes > 0 && op.equalsIgnoreCase(">")) {
-                res.attach(new Var(true));
+            res.attach(new Var(true));
         } else if (tmpRes < 0 && op.equalsIgnoreCase("<")) {
-                res.attach(new Var(true));
+            res.attach(new Var(true));
+        } else if (tmpRes != 0 && op.equalsIgnoreCase("!=")) {
+            res.attach(new Var(true));
         }
         return res;
     }
@@ -192,8 +255,11 @@ public class EvalVisitor extends TsqlBaseVisitor<Integer>  {
 
     @Override
     public Integer visitPrint_statement(TsqlParser.Print_statementContext ctx) {
+        Var var = null;
         if (ctx.expression() != null) {
-            print(ctx.expression().getText());
+            // print(ctx.expression().getText());
+            var = evalSubTree(ctx.expression());
+            print("print stmt ===== " + var.toString());
         }
         return 0;
     }
@@ -391,7 +457,9 @@ public class EvalVisitor extends TsqlBaseVisitor<Integer>  {
     public Integer visitSelect_list(TsqlParser.Select_listContext ctx) {
         sql.append(ctx.getText());
         sql.append(" ");
-        return visitChildren(ctx);
+        // no need eval subTree
+        // return visitChildren(ctx);
+        return 0;
     }
 
     @Override
@@ -399,7 +467,9 @@ public class EvalVisitor extends TsqlBaseVisitor<Integer>  {
         sql.append("from ");
         sql.append(ctx.getText());
         sql.append(" ");
-        return visitChildren(ctx);
+        // no need eval subTree
+        // return visitChildren(ctx);
+        return 0;
     }
 
     /*@Override
