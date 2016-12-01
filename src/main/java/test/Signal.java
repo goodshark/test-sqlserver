@@ -3,8 +3,9 @@ package test;
 /**
  * Created by dengrb1 on 11/28 0028.
  */
+
 public class Signal {
-    public enum Type { LEAVE_LOOP, CONTINUE, GOTO, LEAVE_ROUTINE, LEAVE_PROGRAM, SQLEXCEPTION, NOTFOUND, UNSUPPORTED_OPERATION, USERDEFINED };
+    public enum Type { LEAVE_LOOP, CONTINUE, GOTO, LEAVE_ROUTINE, LEAVE_PROGRAM, SQLEXCEPTION, STOPEXEPTION, NOTFOUND, UNSUPPORTED_OPERATION, USERDEFINED };
     private Type type;
     private String value = "";
     private Exception exception = null;

@@ -17,6 +17,9 @@ public class Scope {
     Scope parent;
     Type type;
 
+    // try-mark
+    boolean tryFlag = false;
+
     Scope(Type type) {
         this.parent = null;
         this.type = type;
@@ -55,6 +58,14 @@ public class Scope {
 
     public ParseTree findLabel(String label) {
         return labels.get(label);
+    }
+
+    public void setTryFlag(boolean flag) {
+        tryFlag = flag;
+    }
+
+    public boolean getTryFlag() {
+        return tryFlag;
     }
 
     public String toString() {

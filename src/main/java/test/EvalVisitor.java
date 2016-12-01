@@ -117,8 +117,8 @@ public class EvalVisitor extends TsqlBaseVisitor<Integer>  {
     public void run(ParseTree tree) {
         enterGlobalScope();
         visit(tree);
-        // TODO signals is not empty
         rewind(tree);
+        // TODO deal other signals
         leaveGlobalScope();
     }
 
@@ -135,6 +135,9 @@ public class EvalVisitor extends TsqlBaseVisitor<Integer>  {
                     print("start rewind the tree");
                     visit(tree);
                 }
+            } else {
+                // TODO just delete other signal
+                signals.pop();
             }
         }
     }
@@ -263,6 +266,80 @@ public class EvalVisitor extends TsqlBaseVisitor<Integer>  {
             }
         }
         return 0;
+    }
+
+    @Override
+    public Integer visitThrow_statement(TsqlParser.Throw_statementContext ctx) {
+        Signal sig = null;
+        if (curScope.getTryFlag()) {
+            String msg = ctx.message.getText();
+            String errorNum = ctx.error_number.getText();
+            String stateId = ctx.state.getText();
+            sig = new Signal(Signal.Type.SQLEXCEPTION, msg + " " + errorNum + " " + stateId);
+            signals.push(sig);
+        } else {
+            sig = new Signal(Signal.Type.STOPEXEPTION, "throw stop exception");
+            signals.push(sig);
+        }
+        return 0;
+    }
+
+    @Override
+    public Integer visitRaiseerror_statement(TsqlParser.Raiseerror_statementContext ctx) {
+        Signal sig = null;
+        if (curScope.getTryFlag()) {
+            String msg = ctx.msg.getText();
+            String lvlId = ctx.severity.getText();
+            String stateId = ctx.state.getText();
+            sig = new Signal(Signal.Type.SQLEXCEPTION, msg + " " + lvlId + " " + stateId);
+            signals.push(sig);
+        } else {
+            sig = new Signal(Signal.Type.STOPEXEPTION, "raise stop exception");
+            signals.push(sig);
+        }
+        return 0;
+    }
+
+    @Override
+    public Integer visitTry_catch_statement(TsqlParser.Try_catch_statementContext ctx) {
+        if (ctx.sql_clauses().size() == 2) {
+            /*try {
+                visit(ctx.sql_clauses(0));
+            } catch (Exception e) {
+                visit(ctx.sql_clauses(1));
+            }*/
+            // mark try
+            enterTryScope();
+            visit(ctx.sql_clauses(0));
+            // del try
+            leaveTrySocpe();
+            if (exceptionOccur()) {
+                visit(ctx.sql_clauses(1));
+            }
+        }
+        return 0;
+    }
+
+    public void enterTryScope() {
+        curScope.setTryFlag(true);
+    }
+
+    public void leaveTrySocpe() {
+        curScope.setTryFlag(false);
+    }
+
+    public boolean exceptionOccur() {
+        Signal sig = null;
+        if (signals.empty()) {
+            return false;
+        } else {
+            sig = signals.peek();
+            if (sig.getType() == Signal.Type.SQLEXCEPTION) {
+                signals.pop();
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
